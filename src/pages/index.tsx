@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import EmailPopup from "@/components/EmailPopup";
 
 type Player = {
   _id?: string;
@@ -31,6 +32,8 @@ const colors = [
 export default function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [pendingVote, setPendingVote] = useState<string | null>(null);
 
   const fetchLeaderboard = async () => {
     const res = await fetch("/api/leaderboard");
@@ -44,104 +47,140 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const vote = async (id: string, name: string) => {
+  const vote = async (id: string, playerName: string) => {
+    const email = localStorage.getItem("email");
+    const name = localStorage.getItem("name");
+
+    if (!email || !name) {
+      setPendingVote(id);
+      setShowPopup(true);
+      return;
+    }
+
     setLoading(true);
     await fetch("/api/vote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, name }),
+      body: JSON.stringify({ id, name, email }),
     });
     await fetchLeaderboard();
     setLoading(false);
   };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "40px 20px",
-        minHeight: "100vh",
-      }}
-    >
-      <h1 style={{ fontSize: 32, marginBottom: 32 }}>🏆 Leaderboard Vote</h1>
+  const nameRef = useRef("");
 
-      <div style={{ width: "100%", maxWidth: 400 }}>
-        <AnimatePresence>
-          {players.map((p, idx) => (
-            <motion.div
-              key={p._id}
-              layout
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                background: colors[idx % colors.length],
-                borderRadius: 12,
-                padding: "16px 24px",
-                marginBottom: 20,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-              }}
-            >
-              <img
-                src={typeof p.avatar === "string" ? p.avatar : ""}
-                alt={p.name}
+  const handleVerified = (verifiedEmail: string) => {
+    localStorage.setItem("email", verifiedEmail);
+    localStorage.setItem("name", nameRef.current || "");
+
+    setShowPopup(false);
+
+    if (pendingVote) {
+      vote(pendingVote, "");
+      setPendingVote(null);
+    }
+  };
+
+  return (
+    <>
+      {" "}
+      {showPopup && (
+        <EmailPopup
+          onVerified={(email, name) => {
+            localStorage.setItem("email", email);
+            localStorage.setItem("name", name);
+            nameRef.current = name;
+            setShowPopup(false);
+          }}
+        />
+      )}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "40px 20px",
+          minHeight: "100vh",
+        }}
+      >
+        <h1 style={{ fontSize: 32, marginBottom: 32 }}>🏆 Leaderboard Vote</h1>
+
+        <div style={{ width: "100%", maxWidth: 400 }}>
+          <AnimatePresence>
+            {players.map((p, idx) => (
+              <motion.div
+                key={p._id}
+                layout
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  marginRight: 16,
-                  border: "2px solid #ccc",
-                }}
-              />
-              <div style={{ flexGrow: 1 }}>
-                <strong style={{ fontSize: 18 }}>
-                  {idx + 1}. {p.name}
-                </strong>
-                <div style={{ fontSize: 15, color: "#666" }}>
-                  {p.votes} votes 👍
-                </div>
-              </div>
-              <button
-                onClick={() => vote(p._id!, p.name)}
-                disabled={loading}
-                style={{
-                  padding: "6px 14px",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: "#fff",
-                  background: "linear-gradient(to right, #6366f1, #3b82f6)", // indigo to blue
-                  border: "none",
-                  borderRadius: 999,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                  opacity: loading ? 0.6 : 1,
-                  transition: "all 0.2s ease-in-out",
-                }}
-                onMouseEnter={(e) => {
-                  if (!loading) {
-                    e.currentTarget.style.background =
-                      "linear-gradient(to right, #4f46e5, #2563eb)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!loading) {
-                    e.currentTarget.style.background =
-                      "linear-gradient(to right, #6366f1, #3b82f6)";
-                  }
+                  display: "flex",
+                  alignItems: "center",
+                  background: colors[idx % colors.length],
+                  borderRadius: 12,
+                  padding: "16px 24px",
+                  marginBottom: 20,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                 }}
               >
-                Vote
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                <img
+                  src={typeof p.avatar === "string" ? p.avatar : ""}
+                  alt={p.name}
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    marginRight: 16,
+                    border: "2px solid #ccc",
+                  }}
+                />
+                <div style={{ flexGrow: 1 }}>
+                  <strong style={{ fontSize: 18 }}>
+                    {idx + 1}. {p.name}
+                  </strong>
+                  <div style={{ fontSize: 15, color: "#666" }}>
+                    {p.votes} votes 👍
+                  </div>
+                </div>
+                <button
+                  onClick={() => vote(p._id!, p.name)}
+                  disabled={loading}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "#fff",
+                    background: "linear-gradient(to right, #6366f1, #3b82f6)", // indigo to blue
+                    border: "none",
+                    borderRadius: 999,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                    opacity: loading ? 0.6 : 1,
+                    transition: "all 0.2s ease-in-out",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background =
+                        "linear-gradient(to right, #4f46e5, #2563eb)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background =
+                        "linear-gradient(to right, #6366f1, #3b82f6)";
+                    }
+                  }}
+                >
+                  Vote
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
