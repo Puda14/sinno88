@@ -103,7 +103,9 @@ export default function Home() {
           minHeight: "100vh",
         }}
       >
-        <h1 style={{ fontSize: 32, marginBottom: 32 }}>🏆 Leaderboard Vote</h1>
+        <h1 style={{ fontSize: 32, marginBottom: 32 }}>
+          🏆 Sinno88 bet chủ nhiệm
+        </h1>
 
         <div style={{ width: "100%", maxWidth: 400 }}>
           <AnimatePresence>
